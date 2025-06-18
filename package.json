@@ -55,10 +55,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/freeleepm/jimeng-mcp.git"
+    "url": "git+https://github.com/freeleepm/jimeng-ai-mcp.git"
   },
   "bugs": {
-    "url": "https://github.com/freeleepm/jimeng-mcp/issues"
+    "url": "https://github.com/freeleepm/jimeng-ai-mcp/issues"
   },
-  "homepage": "https://github.com/freeleepm/jimeng-mcp#readme"
+  "homepage": "https://github.com/freeleepm/jimeng-ai-mcp#readme"
 }

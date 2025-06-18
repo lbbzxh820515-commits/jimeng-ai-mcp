@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "jimeng": {
+      "type": "stdio",
+      "command": "npx jimeng-ai-mcp",
+      "env": {
+        "JIMENG_ACCESS_KEY": "你的火山引擎访问密钥",
+        "JIMENG_SECRET_KEY": "你的火山引擎密钥"
+      }
+    }
+  }
+} 
