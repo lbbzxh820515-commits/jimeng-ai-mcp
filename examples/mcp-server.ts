@@ -104,11 +104,20 @@ server.tool(
     const imageSize = RATIO_MAPPING[ratio];
     
     if (!imageSize) {
+      // 构建标准JSON格式的错误返回数据
+      const errorData = {
+        status: "error",
+        message: "不支持的图片比例",
+        error: `不支持的比例: ${ratio}`,
+        supported_ratios: ["4:3", "3:4", "16:9", "9:16"],
+        timestamp: new Date().toISOString()
+      };
+      
       return {
         content: [
           {
             type: "text",
-            text: `错误：不支持的图片比例 ${ratio}。支持的比例: 4:3, 3:4, 16:9, 9:16`
+            text: JSON.stringify(errorData, null, 2)
           }
         ],
         isError: true
@@ -117,11 +126,20 @@ server.tool(
 
     // 检查API密钥是否配置
     if (!JIMENG_ACCESS_KEY || !JIMENG_SECRET_KEY) {
+      // 构建标准JSON格式的错误返回数据
+      const errorData = {
+        status: "error",
+        message: "API密钥未配置",
+        error: "未设置环境变量 JIMENG_ACCESS_KEY 和 JIMENG_SECRET_KEY",
+        help: "请参考文档配置环境变量",
+        timestamp: new Date().toISOString()
+      };
+      
       return {
         content: [
           {
             type: "text",
-            text: "错误：未设置环境变量 JIMENG_ACCESS_KEY 和 JIMENG_SECRET_KEY，无法调用API。请参考文档配置环境变量。"
+            text: JSON.stringify(errorData, null, 2)
           }
         ],
         isError: true
@@ -146,11 +164,19 @@ server.tool(
       });
 
       if (!result.success || !result.image_urls || result.image_urls.length === 0) {
+        // 构建标准JSON格式的失败返回数据
+        const failureData = {
+          status: "error",
+          message: "生成图片失败",
+          error: result.error || "未知错误",
+          timestamp: new Date().toISOString()
+        };
+        
         return {
           content: [
             {
               type: "text",
-              text: `生成图片失败：${result.error || "未知错误"}`
+              text: JSON.stringify(failureData, null, 2)
             }
           ],
           isError: true
@@ -160,20 +186,45 @@ server.tool(
       // 获取LLM优化后的提示词
       const llmPrompt = result.raw_response?.data?.rephraser_result || prompt;
 
+      // 构建符合MCP标准的返回数据，包含JSON格式的结果
+      const responseData = {
+        status: "success",
+        message: "图片生成成功",
+        data: {
+          text,
+          illustration,
+          color,
+          ratio,
+          dimensions: `${imageSize.width}×${imageSize.height}`,
+          prompt,
+          llm_prompt: llmPrompt,
+          image_url: result.image_urls[0]
+        },
+        timestamp: new Date().toISOString()
+      };
+
       return {
         content: [
           {
             type: "text",
-            text: `图片生成成功！\n\n显示文字: ${text}\n配饰元素: ${illustration}\n背景色调: ${color}\n图片比例: ${ratio} (${imageSize.width}×${imageSize.height})\n生成提示词: ${prompt}\nLLM优化提示词: ${llmPrompt}\n图片URL: ${result.image_urls[0]}`
+            text: JSON.stringify(responseData, null, 2)
           }
         ]
       };
     } catch (error) {
+      // 构建标准JSON格式的错误返回数据
+      const errorData = {
+        status: "error",
+        message: "生成图片时发生错误",
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString()
+      };
+      
       return {
         content: [
           {
             type: "text",
-            text: `生成图片时发生错误：${error instanceof Error ? error.message : String(error)}`
+            text: JSON.stringify(errorData, null, 2)
           }
         ],
         isError: true
@@ -194,11 +245,20 @@ server.tool(
     
     // 检查API密钥是否配置
     if (!JIMENG_ACCESS_KEY || !JIMENG_SECRET_KEY) {
+      // 构建标准JSON格式的错误返回数据
+      const errorData = {
+        status: "error",
+        message: "API密钥未配置",
+        error: "未设置环境变量 JIMENG_ACCESS_KEY 和 JIMENG_SECRET_KEY",
+        help: "请参考文档配置环境变量",
+        timestamp: new Date().toISOString()
+      };
+      
       return {
         content: [
           {
             type: "text",
-            text: "错误：未设置环境变量 JIMENG_ACCESS_KEY 和 JIMENG_SECRET_KEY，无法调用API。请参考文档配置环境变量。"
+            text: JSON.stringify(errorData, null, 2)
           }
         ],
         isError: true
@@ -223,32 +283,63 @@ server.tool(
       
       if (!result.success || !result.video_urls || result.video_urls.length === 0) {
         console.error("视频生成失败:", result.error);
+        
+        // 构建标准JSON格式的失败返回数据
+        const failureData = {
+          status: "error",
+          message: "视频生成失败",
+          error: result.error || "未知错误",
+          task_id: result.task_id || null,
+          timestamp: new Date().toISOString()
+        };
+        
         return {
           content: [
             {
               type: "text",
-              text: `视频生成失败: ${result.error || "未知错误"}\n\n${result.task_id ? `任务ID: ${result.task_id}\n可以使用该ID手动查询状态` : ""}`
+              text: JSON.stringify(failureData, null, 2)
             }
           ],
           isError: true
         };
       }
       
+      // 构建符合MCP标准的返回数据，包含JSON格式的结果
+      const responseData = {
+        status: "success",
+        message: "视频生成成功",
+        data: {
+          prompt,
+          video_url: result.video_urls[0],
+          task_id: result.task_id || ""
+        },
+        timestamp: new Date().toISOString()
+      };
+
       return {
         content: [
           {
             type: "text",
-            text: `视频生成成功！\n\n提示词: ${prompt}\n视频URL: ${result.video_urls[0]}`
+            text: JSON.stringify(responseData, null, 2)
           }
         ]
       };
     } catch (error) {
       console.error("视频生成出错:", error);
+      
+      // 构建标准JSON格式的错误返回数据
+      const errorData = {
+        status: "error",
+        message: "视频生成时发生错误",
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString()
+      };
+      
       return {
         content: [
           {
             type: "text",
-            text: `视频生成时发生错误：${error instanceof Error ? error.message : String(error)}`
+            text: JSON.stringify(errorData, null, 2)
           }
         ],
         isError: true
@@ -264,9 +355,30 @@ async function main() {
     const transport = new StdioServerTransport();
     await server.connect(transport);
     
-    console.log("即梦AI MCP服务器已启动，等待请求中...");
+    // 使用JSON格式返回启动成功的信息
+    const startupInfo = {
+      status: "success",
+      message: "即梦AI MCP服务器已启动",
+      serverInfo: {
+        name: "jimengpic-mcp",
+        version: "1.0.0",
+        authStatus: JIMENG_ACCESS_KEY && JIMENG_SECRET_KEY ? "configured" : "unconfigured"
+      },
+      timestamp: new Date().toISOString()
+    };
+    
+    // 打印JSON格式的启动信息
+    console.log(JSON.stringify(startupInfo, null, 2));
   } catch (error) {
-    console.error("MCP服务器启动失败:", error);
+    // 错误信息也使用JSON格式
+    const errorInfo = {
+      status: "error",
+      message: "MCP服务器启动失败",
+      error: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString()
+    };
+    
+    console.error(JSON.stringify(errorInfo, null, 2));
     process.exit(1);
   }
 }

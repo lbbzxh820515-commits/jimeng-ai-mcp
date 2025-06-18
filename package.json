@@ -1,6 +1,6 @@
 {
   "name": "jimeng-ai-mcp",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "火山引擎即梦AI多模态生成服务MCP工具",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
