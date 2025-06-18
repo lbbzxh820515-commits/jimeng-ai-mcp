@@ -1,13 +1,13 @@
 # 即梦AI多模态MCP
 
-这是一个基于火山引擎即梦AI的多模态生成服务，支持图像生成、视频生成等功能，可通过MCP协议在Cursor、Claude Desktop等MCP客户端中使用，也可作为独立库调用。
+这是一个基于火山引擎即梦AI的多模态生成服务，支持图像生成、视频生成等功能，可通过MCP协议在Cursor、Claude Desktop等MCP客户端中使用，也可作为独立库调用。支持 macOS、Linux、Windows 及 WSL 环境。
 
 ## 核心功能
 
 - ✅ **文生图** - 通过文本描述生成高质量图像 (模型: jimeng_t2i_s20pro)
 - ✅ **文生视频** - 将文本描述转换为流畅视频 (模型: jimeng_vgfm_t2v_l20)
 - ✅ **图生视频** - 将静态图像转换为动态视频 (模型: jimeng_vgfm_i2v_l20)
-- 📱 多平台支持 - 可在任何支持MCP的客户端中使用
+- ✅ **多平台支持** - 支持 macOS、Linux、Windows 及 WSL 环境
 - 🛠️ 完整TypeScript类型定义和错误处理
 - 🔄 支持异步任务处理和状态追踪
 - 🎛️ 自定义参数控制 (尺寸、比例、帧数等)
@@ -16,7 +16,22 @@
 
 ### 安装
 
+#### macOS/Linux
+
 ```bash
+# NPM全局安装
+npm install -g jimeng-ai-mcp
+
+# 或本地安装
+git clone https://github.com/freeleepm/jimeng-ai-mcp.git
+cd jimeng-mcp
+npm install
+npm run build
+```
+
+#### Windows
+
+```cmd
 # NPM全局安装
 npm install -g jimeng-ai-mcp
 
@@ -31,6 +46,8 @@ npm run build
 
 在使用前，需设置火山引擎即梦AI服务的访问密钥：
 
+#### macOS/Linux
+
 ```bash
 # 设置环境变量
 export JIMENG_ACCESS_KEY=你的火山引擎访问密钥
@@ -41,9 +58,27 @@ echo "JIMENG_ACCESS_KEY=你的火山引擎访问密钥" > .env
 echo "JIMENG_SECRET_KEY=你的火山引擎密钥" >> .env
 ```
 
+#### Windows
+
+```cmd
+# 设置环境变量
+set JIMENG_ACCESS_KEY=你的火山引擎访问密钥
+set JIMENG_SECRET_KEY=你的火山引擎密钥
+
+# 或创建.env文件
+echo JIMENG_ACCESS_KEY=你的火山引擎访问密钥 > .env
+echo JIMENG_SECRET_KEY=你的火山引擎密钥 >> .env
+
+# 或永久设置环境变量（管理员命令提示符）
+setx JIMENG_ACCESS_KEY "你的火山引擎访问密钥"
+setx JIMENG_SECRET_KEY "你的火山引擎密钥"
+```
+
 ## MCP客户端配置
 
 ### Cursor配置
+
+#### macOS/Linux
 
 在Cursor配置目录中创建`mcp-config.json`文件：
 
@@ -52,7 +87,59 @@ echo "JIMENG_SECRET_KEY=你的火山引擎密钥" >> .env
   "mcpServers": {
     "jimeng": {
       "type": "stdio",
-      "command": "npx jimeng-ai-mcp",
+      "command": "npx",
+      "args": [
+        "-y",
+        "jimeng-ai-mcp"
+      ],
+      "env": {
+        "JIMENG_ACCESS_KEY": "你的火山引擎访问密钥",
+        "JIMENG_SECRET_KEY": "你的火山引擎密钥"
+      }
+    }
+  }
+}
+```
+
+#### Windows
+
+在Cursor配置目录中创建`mcp-config.json`文件：
+
+```json
+{
+  "mcpServers": {
+    "jimeng": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "jimeng-ai-mcp"
+      ],
+      "env": {
+        "JIMENG_ACCESS_KEY": "你的火山引擎访问密钥",
+        "JIMENG_SECRET_KEY": "你的火山引擎密钥"
+      }
+    }
+  }
+}
+```
+
+#### WSL (Windows Subsystem for Linux)
+
+在Cursor配置目录中创建`mcp-config.json`文件：
+
+```json
+{
+  "mcpServers": {
+    "jimeng": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "jimeng-ai-mcp"
+      ],
       "env": {
         "JIMENG_ACCESS_KEY": "你的火山引擎访问密钥",
         "JIMENG_SECRET_KEY": "你的火山引擎密钥"
@@ -64,13 +151,19 @@ echo "JIMENG_SECRET_KEY=你的火山引擎密钥" >> .env
 
 ### Claude Desktop配置
 
+#### macOS/Linux
+
 在Claude Desktop的配置文件`claude_desktop_config.json`中添加：
 
 ```json
 {
   "mcpServers": {
     "jimeng": {
-      "command": "jimeng-ai-mcp",
+      "command": "npx",
+      "args": [
+        "-y",
+        "jimeng-ai-mcp"
+      ],
       "env": {
         "JIMENG_ACCESS_KEY": "你的火山引擎访问密钥",
         "JIMENG_SECRET_KEY": "你的火山引擎密钥"
@@ -78,6 +171,55 @@ echo "JIMENG_SECRET_KEY=你的火山引擎密钥" >> .env
     }
   }
 }
+```
+
+#### Windows
+
+在Claude Desktop的配置文件`claude_desktop_config.json`中添加：
+
+```json
+{
+  "mcpServers": {
+    "jimeng": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "jimeng-ai-mcp"
+      ],
+      "env": {
+        "JIMENG_ACCESS_KEY": "你的火山引擎访问密钥",
+        "JIMENG_SECRET_KEY": "你的火山引擎密钥"
+      }
+    }
+  }
+}
+```
+
+#### WSL (Windows Subsystem for Linux)
+
+在Claude Desktop的配置文件`claude_desktop_config.json`中添加：
+
+```json
+{
+  "mcpServers": {
+    "jimeng": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "jimeng-ai-mcp"
+      ],
+      "env": {
+        "JIMENG_ACCESS_KEY": "你的火山引擎访问密钥",
+        "JIMENG_SECRET_KEY": "你的火山引擎密钥"
+      }
+    }
+  }
+}
+```
+
+> 注意：在 Windows 环境下，您可能需要根据实际安装路径调整命令。在 WSL 环境中，使用 cmd /c 前缀可以确保命令正确执行。
 ```
 
 ## MCP工具使用
