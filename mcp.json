@@ -1,8 +1,8 @@
 {
-  "name": "jimeng-mcp",
-  "version": "1.0.0",
+  "name": "jimeng-ai-mcp",
+  "version": "1.0.5",
   "description": "火山引擎即梦AI多模态生成服务MCP工具",
-  "author": "",
+  "author": "Jimeng AI",
   "license": "MIT",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
@@ -74,6 +74,10 @@
             "type": "string",
             "description": "视频内容的描述"
           },
+          "async": {
+            "type": "boolean",
+            "description": "是否异步生成视频，true表示立即返回任务ID，false或不填表示等待视频生成完成"
+          },
           "region": {
             "type": "string",
             "description": "火山引擎区域",
@@ -81,6 +85,79 @@
           }
         },
         "required": ["prompt"]
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["text"]
+                },
+                "text": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "submit-video-task",
+      "description": "提交视频生成任务，立即返回任务ID，不等待视频生成完成",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "视频内容的描述"
+          },
+          "region": {
+            "type": "string",
+            "description": "火山引擎区域",
+            "default": "cn-north-1"
+          }
+        },
+        "required": ["prompt"]
+      },
+      "returns": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["text"]
+                },
+                "text": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "get-video-task",
+      "description": "查询视频生成任务的结果，根据任务ID获取视频生成结果",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "任务ID，通过submit-video-task工具获取"
+          }
+        },
+        "required": ["task_id"]
       },
       "returns": {
         "type": "object",

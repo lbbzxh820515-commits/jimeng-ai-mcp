@@ -4,6 +4,12 @@
 
 ## 版本更新
 
+### v1.0.5
+- 优化文档结构，为不同平台提供清晰配置说明
+- 增加 PowerShell 配置示例
+- 提供各平台永久环境变量设置方法
+- 添加多平台配置注意事项
+
 ### v1.0.4
 - 优化服务启动和响应返回，现在所有响应均使用标准JSON格式
 - 统一错误处理和成功响应的数据结构
@@ -19,26 +25,22 @@
 - 🔄 支持异步任务处理和状态追踪
 - 🎛️ 自定义参数控制 (尺寸、比例、帧数等)
 
+## 可用MCP工具
+
+| 工具名称 | 描述 | 主要参数 |
+|---------|------|---------|
+| `generate-image` | 生成图像 | text, illustration, color, ratio |
+| `generate-video` | 生成视频 | prompt, async |
+| `submit-video-task` | 提交视频生成任务 | prompt |
+| `get-video-task` | 获取视频任务结果 | task_id |
+
 ## 快速开始
 
 ### 安装
 
-#### macOS/Linux
+所有平台（macOS/Linux/Windows）：
 
 ```bash
-# NPM全局安装
-npm install -g jimeng-ai-mcp
-
-# 或本地安装
-git clone https://github.com/freeleepm/jimeng-ai-mcp.git
-cd jimeng-mcp
-npm install
-npm run build
-```
-
-#### Windows
-
-```cmd
 # NPM全局安装
 npm install -g jimeng-ai-mcp
 
@@ -63,22 +65,60 @@ export JIMENG_SECRET_KEY=你的火山引擎密钥
 # 或创建.env文件
 echo "JIMENG_ACCESS_KEY=你的火山引擎访问密钥" > .env
 echo "JIMENG_SECRET_KEY=你的火山引擎密钥" >> .env
+
+# 永久设置环境变量（添加到 .bashrc 或 .zshrc）
+echo 'export JIMENG_ACCESS_KEY="你的火山引擎访问密钥"' >> ~/.bashrc
+echo 'export JIMENG_SECRET_KEY="你的火山引擎密钥"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+#### WSL (Windows Subsystem for Linux)
+
+```bash
+# 设置环境变量
+export JIMENG_ACCESS_KEY=你的火山引擎访问密钥
+export JIMENG_SECRET_KEY=你的火山引擎密钥
+
+# 或创建.env文件
+echo "JIMENG_ACCESS_KEY=你的火山引擎访问密钥" > .env
+echo "JIMENG_SECRET_KEY=你的火山引擎密钥" >> .env
+
+# 永久设置环境变量（添加到 .bashrc）
+echo 'export JIMENG_ACCESS_KEY="你的火山引擎访问密钥"' >> ~/.bashrc
+echo 'export JIMENG_SECRET_KEY="你的火山引擎密钥"' >> ~/.bashrc
+source ~/.bashrc
 ```
 
 #### Windows
 
+命令提示符 (CMD):
 ```cmd
-# 设置环境变量
+:: 临时设置环境变量（当前会话有效）
 set JIMENG_ACCESS_KEY=你的火山引擎访问密钥
 set JIMENG_SECRET_KEY=你的火山引擎密钥
 
-# 或创建.env文件
+:: 创建.env文件
 echo JIMENG_ACCESS_KEY=你的火山引擎访问密钥 > .env
 echo JIMENG_SECRET_KEY=你的火山引擎密钥 >> .env
 
-# 或永久设置环境变量（管理员命令提示符）
+:: 永久设置环境变量（管理员命令提示符）
 setx JIMENG_ACCESS_KEY "你的火山引擎访问密钥"
 setx JIMENG_SECRET_KEY "你的火山引擎密钥"
+```
+
+PowerShell:
+```powershell
+# 临时设置环境变量（当前会话有效）
+$env:JIMENG_ACCESS_KEY = "你的火山引擎访问密钥"
+$env:JIMENG_SECRET_KEY = "你的火山引擎密钥"
+
+# 创建.env文件
+"JIMENG_ACCESS_KEY=你的火山引擎访问密钥" | Out-File -FilePath .env -Encoding ASCII
+"JIMENG_SECRET_KEY=你的火山引擎密钥" | Out-File -FilePath .env -Encoding ASCII -Append
+
+# 永久设置环境变量（管理员PowerShell）
+[Environment]::SetEnvironmentVariable("JIMENG_ACCESS_KEY", "你的火山引擎访问密钥", "User")
+[Environment]::SetEnvironmentVariable("JIMENG_SECRET_KEY", "你的火山引擎密钥", "User")
 ```
 
 ## MCP客户端配置
@@ -156,6 +196,8 @@ setx JIMENG_SECRET_KEY "你的火山引擎密钥"
 }
 ```
 
+> 注意：WSL环境下需要使用`cmd /c`前缀来确保命令正确执行。
+
 ### Claude Desktop配置
 
 #### macOS/Linux
@@ -226,7 +268,90 @@ setx JIMENG_SECRET_KEY "你的火山引擎密钥"
 }
 ```
 
-> 注意：在 Windows 环境下，您可能需要根据实际安装路径调整命令。在 WSL 环境中，使用 cmd /c 前缀可以确保命令正确执行。
+### 配置注意事项
+
+- **macOS/Linux**: 确保使用正确的环境变量和路径。
+- **Windows**: 
+  - 如果遇到路径问题，请检查命令路径是否正确，必要时使用完整路径。
+  - 如果使用全局安装，可将 `npx -y jimeng-ai-mcp` 改为 `jimeng-ai-mcp` 命令。
+- **WSL (Windows Subsystem for Linux)**: 
+  - 在 WSL 环境中，必须使用 `cmd /c` 前缀来确保命令正确执行。
+  - 请确保 Windows 端已正确安装 Node.js 和 npm。
+
+## 工具使用示例
+
+在支持 MCP 的客户端（如 Cursor、Claude Desktop）中，可以使用以下方式调用即梦AI工具：
+
+### 生成图像示例
+
+```
+请使用generate-image工具生成一张图片，图片上显示"创新未来"文字，配饰元素包括科技、星空、光线，背景色调为蓝色，比例为16:9。
+```
+
+### 生成视频示例
+
+```
+请使用generate-video工具生成一段视频，视频内容为"熊猫在竹林中玩耍，阳光明媚，高清写实风格"。
+```
+
+### 异步视频任务示例
+
+```
+请使用submit-video-task工具提交一个视频生成任务，视频内容为"一只白色的小猪在沙滩上跑动"。提交后使用get-video-task工具查询结果。
+```
+
+## 常见问题与故障排除
+
+### 1. 无法通过 npx 安装或运行
+
+如果遇到 `npx jimeng-ai-mcp` 无法找到包的问题，请尝试：
+
+- 确认网络连接正常，能够访问 npm 仓库
+- 使用 `npm install -g jimeng-ai-mcp` 先全局安装，再使用 `jimeng-ai-mcp` 命令
+- 检查 Node.js 版本是否满足要求 (需要 v14.0.0 或更高版本)
+
+### 2. 环境变量问题
+
+- 确保已正确设置 `JIMENG_ACCESS_KEY` 和 `JIMENG_SECRET_KEY` 环境变量
+- 在 MCP 客户端配置文件中也需要配置这些环境变量
+- 可以通过创建 .env 文件设置环境变量（项目提供了 .env.example 作为参考，确保文件位于工作目录）
+
+### 3. 多平台兼容性
+
+- Windows 用户可能需要调整路径分隔符（使用 `\\` 或 `/`）
+- WSL 用户需要使用 `cmd /c` 前缀
+- 确保 npm 包已正确安装在当前系统环境中
+
+## 贡献与开发
+
+欢迎为项目贡献代码或提出改进建议！以下是开发流程：
+
+1. Fork 项目仓库
+2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
+3. 提交更改 (`git commit -m 'Add some amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 创建 Pull Request
+
+### 开发环境设置
+
+```bash
+# 克隆仓库
+git clone https://github.com/freeleepm/jimeng-ai-mcp.git
+cd jimeng-ai-mcp
+
+# 安装依赖
+npm install
+
+# 启动开发服务器
+npm run dev
+
+# 构建生产版本
+npm run build
+
+# 发布到npm（需要npm账户权限）
+npm version patch  # 更新版本号
+npm publish
+```
 ```
 
 ## MCP工具使用
