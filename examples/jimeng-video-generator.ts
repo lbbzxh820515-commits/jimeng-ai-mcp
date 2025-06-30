@@ -91,9 +91,17 @@ async function demoTextToVideo(prompt: string, oneStep: boolean = false) {
     
     if (result.success && result.video_urls && result.video_urls.length > 0) {
       console.log('\n视频生成成功!');
-      console.log('视频URL:', result.video_urls[0]);
+      console.log('视频URL列表:');
+      result.video_urls.forEach((url, index) => {
+        console.log(`[${index + 1}] ${url}`);
+      });
       
       // 任务ID可以用于后续查询
+      if (result.task_id) {
+        console.log('任务ID:', result.task_id);
+      }
+    } else if (result.success) {
+      console.log('\n视频生成成功，但未返回视频URL');
       if (result.task_id) {
         console.log('任务ID:', result.task_id);
       }
@@ -158,7 +166,14 @@ async function demoImageToVideo(imageUrl: string, prompt?: string, oneStep: bool
         
         if (result.success && result.status === 'SUCCEEDED') {
           console.log('视频生成成功!');
-          console.log('视频URL:', result.video_urls);
+          console.log('视频URL列表:');
+          if (result.video_urls && result.video_urls.length > 0) {
+            result.video_urls.forEach((url, index) => {
+              console.log(`[${index + 1}] ${url}`);
+            });
+          } else {
+            console.log('未返回视频URL');
+          }
           return;
         } else if (!result.success) {
           console.error('查询任务失败:', result.error);
@@ -212,7 +227,12 @@ async function checkTaskResult(taskId: string, type: string = 't2v') {
       
       if ((result.status === 'SUCCEEDED' || result.status === 'done') && result.video_urls && result.video_urls.length > 0) {
         console.log('视频生成成功!');
-        console.log('视频URL:', result.video_urls[0]);
+        console.log('视频URL列表:');
+        result.video_urls.forEach((url, index) => {
+          console.log(`[${index + 1}] ${url}`);
+        });
+      } else if ((result.status === 'SUCCEEDED' || result.status === 'done')) {
+        console.log('视频生成成功，但未返回视频URL');
       } else if (result.status === 'FAILED') {
         console.error('视频生成失败!');
       } else {

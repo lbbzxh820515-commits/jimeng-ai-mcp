@@ -2,6 +2,15 @@ import axios from 'axios';
 import crypto from 'crypto';
 
 /**
+ * 调试日志函数，确保所有日志只输出到 stderr
+ */
+function debugLog(...args: any[]) {
+  if (process.stderr && process.stderr.write) {
+    process.stderr.write(args.map(arg => typeof arg === 'string' ? arg : JSON.stringify(arg, null, 2)).join(' ') + '\n');
+  }
+}
+
+/**
  * 即梦AI客户端配置
  */
 export interface JimengClientConfig {
@@ -150,12 +159,12 @@ export class JimengClient {
     }
 
     if (this.debug) {
-      console.log('JimengClient 初始化完成:');
-      console.log('- 端点:', this.endpoint);
-      console.log('- 区域:', this.region);
-      console.log('- 服务:', this.service);
-      console.log('- AccessKey:', this.accessKey);
-      console.log('- SecretKey:', this.secretKey.substring(0, 3) + '...(已隐藏)');
+      debugLog('JimengClient 初始化完成:');
+      debugLog('- 端点:', this.endpoint);
+      debugLog('- 区域:', this.region);
+      debugLog('- 服务:', this.service);
+      debugLog('- AccessKey:', this.accessKey);
+      debugLog('- SecretKey:', this.secretKey.substring(0, 3) + '...(已隐藏)');
     }
   }
 
@@ -215,7 +224,7 @@ export class JimengClient {
     ].join('\n');
     
     if (this.debug) {
-      console.log('规范请求字符串:\n' + canonicalRequest);
+      debugLog('规范请求字符串:\n' + canonicalRequest);
     }
     
     const algorithm = 'HMAC-SHA256';
@@ -228,14 +237,14 @@ export class JimengClient {
     ].join('\n');
     
     if (this.debug) {
-      console.log('待签名字符串:\n' + stringToSign);
+      debugLog('待签名字符串:\n' + stringToSign);
     }
     
     const signingKey = this.getSignatureKey(this.secretKey, datestamp, usedRegion, this.service);
     const signature = crypto.createHmac('sha256', signingKey).update(stringToSign).digest('hex');
     
     if (this.debug) {
-      console.log('签名值:', signature);
+      debugLog('签名值:', signature);
     }
     
     const authorizationHeader = `${algorithm} Credential=${this.accessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
@@ -294,7 +303,7 @@ export class JimengClient {
         const formattedBody = JSON.stringify(bodyParams);
         
         if (this.debug) {
-          console.log('请求体:', formattedBody);
+          debugLog('请求体:', formattedBody);
         }
         
         // 生成签名和请求头
@@ -305,8 +314,8 @@ export class JimengClient {
         );
         
         if (this.debug) {
-          console.log('请求URL:', requestUrl);
-          console.log('请求头:', JSON.stringify(headers, null, 2));
+          debugLog('请求URL:', requestUrl);
+          debugLog('请求头:', JSON.stringify(headers, null, 2));
         }
         
         // 发送请求
@@ -317,9 +326,9 @@ export class JimengClient {
         });
         
         if (this.debug) {
-          console.log('响应状态码:', response.status);
-          console.log('响应头:', JSON.stringify(response.headers, null, 2));
-          console.log('响应数据:', JSON.stringify(response.data, null, 2));
+          debugLog('响应状态码:', response.status);
+          debugLog('响应头:', JSON.stringify(response.headers, null, 2));
+          debugLog('响应数据:', JSON.stringify(response.data, null, 2));
         }
         
         // 处理响应
@@ -351,7 +360,7 @@ export class JimengClient {
         lastError = error instanceof Error ? error : new Error(String(error));
         
         if (this.debug) {
-          console.error(`尝试 #${retryCount + 1} 失败:`, lastError.message);
+          debugLog(`尝试 #${retryCount + 1} 失败:`, lastError.message);
         }
         
         retryCount++;
@@ -359,7 +368,7 @@ export class JimengClient {
         // 如果已经达到最大重试次数，返回错误
         if (retryCount > this.retries) {
           if (this.debug) {
-            console.error(`已达到最大重试次数 (${this.retries})，放弃重试`);
+            debugLog(`已达到最大重试次数 (${this.retries})，放弃重试`);
           }
           
           return {
@@ -372,7 +381,7 @@ export class JimengClient {
         const waitTime = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
         
         if (this.debug) {
-          console.log(`等待 ${waitTime}ms 后重试...`);
+          debugLog(`等待 ${waitTime}ms 后重试...`);
         }
         
         await new Promise(resolve => setTimeout(resolve, waitTime));
@@ -417,7 +426,7 @@ export class JimengClient {
         const formattedBody = JSON.stringify(bodyParams);
         
         // 总是开启调试信息以便排查问题
-        console.log('提交任务请求体:', formattedBody);
+        debugLog('提交任务请求体:', formattedBody);
         
         // 生成签名和请求头
         const { headers, requestUrl } = this.signV4Request(
@@ -427,8 +436,8 @@ export class JimengClient {
         );
         
         // 打印请求信息以便调试
-        console.log('提交任务请求URL:', requestUrl);
-        console.log('提交任务请求头:', JSON.stringify(headers, null, 2));
+        debugLog('提交任务请求URL:', requestUrl);
+        debugLog('提交任务请求头:', JSON.stringify(headers, null, 2));
         
         // 发送请求
         const response = await axios.post(requestUrl, bodyParams, {
@@ -438,8 +447,8 @@ export class JimengClient {
         });
         
         // 打印响应信息以便调试
-        console.log('提交任务响应状态码:', response.status);
-        console.log('提交任务响应数据:', JSON.stringify(response.data, null, 2));
+        debugLog('提交任务响应状态码:', response.status);
+        debugLog('提交任务响应数据:', JSON.stringify(response.data, null, 2));
         
         // 处理响应
         if (response.status !== 200) {
@@ -474,7 +483,7 @@ export class JimengClient {
         lastError = error instanceof Error ? error : new Error(String(error));
         
         if (this.debug) {
-          console.error(`尝试提交任务 #${retryCount + 1} 失败:`, lastError.message);
+          debugLog(`尝试提交任务 #${retryCount + 1} 失败:`, lastError.message);
         }
         
         retryCount++;
@@ -482,7 +491,7 @@ export class JimengClient {
         // 如果已经达到最大重试次数，返回错误
         if (retryCount > retries) {
           if (this.debug) {
-            console.error(`已达到最大重试次数 (${retries})，放弃重试`);
+            debugLog(`已达到最大重试次数 (${retries})，放弃重试`);
           }
           
           // 如果是429错误，给出更友好的提示
@@ -502,8 +511,8 @@ export class JimengClient {
         // 视频API调用等待时间设为固定的60秒（1分钟），符合QPS=1的限制
         const waitTime = 60000; // 60秒 = 1分钟
         
-        console.log(`请求受限，等待 ${waitTime/1000} 秒后重试...`);
-        console.log(`将在 ${new Date(Date.now() + waitTime).toLocaleTimeString()} 重试`);
+        debugLog(`请求受限，等待 ${waitTime/1000} 秒后重试...`);
+        debugLog(`将在 ${new Date(Date.now() + waitTime).toLocaleTimeString()} 重试`);
         
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
@@ -542,7 +551,7 @@ export class JimengClient {
         const formattedBody = JSON.stringify(bodyParams);
         
         // 总是开启调试信息以便排查问题
-        console.log('查询结果请求体:', formattedBody);
+        debugLog('查询结果请求体:', formattedBody);
         
         // 生成签名和请求头
         const { headers, requestUrl } = this.signV4Request(
@@ -552,8 +561,8 @@ export class JimengClient {
         );
         
         // 开启调试信息
-        console.log('查询结果请求URL:', requestUrl);
-        console.log('查询结果请求头:', headers);
+        debugLog('查询结果请求URL:', requestUrl);
+        debugLog('查询结果请求头:', headers);
         
         // 发送请求
         const response = await axios({
@@ -563,8 +572,8 @@ export class JimengClient {
           data: formattedBody,
         });
         
-        console.log('查询结果响应状态码:', response.status);
-        console.log('查询结果响应数据:', JSON.stringify(response.data, null, 2));
+        debugLog('查询结果响应状态码:', response.status);
+        debugLog('查询结果响应数据:', JSON.stringify(response.data, null, 2));
         
         // 处理响应
         if (response.status === 200) {
@@ -622,7 +631,7 @@ export class JimengClient {
                 videoUrls = respData.urls;
               }
             } catch (e) {
-              console.error('解析resp_data时出错:', e);
+              debugLog('解析resp_data时出错:', e);
             }
           }
           
@@ -645,7 +654,7 @@ export class JimengClient {
         lastError = error instanceof Error ? error : new Error(String(error));
         
         if (this.debug) {
-          console.error(`尝试查询结果 #${retryCount + 1} 失败:`, lastError.message);
+          debugLog(`尝试查询结果 #${retryCount + 1} 失败:`, lastError.message);
         }
         
         retryCount++;
@@ -653,7 +662,7 @@ export class JimengClient {
         // 如果已经达到最大重试次数，返回错误
         if (retryCount > retries) {
           if (this.debug) {
-            console.error(`已达到最大重试次数 (${retries})，放弃重试`);
+            debugLog(`已达到最大重试次数 (${retries})，放弃重试`);
           }
           
           return {
@@ -665,7 +674,7 @@ export class JimengClient {
         // 查询结果API调用使用较短的重试时间
         const waitTime = 5000; // 5秒
         
-        console.log(`查询失败，等待 ${waitTime/1000} 秒后重试...`);
+        debugLog(`查询失败，等待 ${waitTime/1000} 秒后重试...`);
         
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
@@ -683,7 +692,7 @@ export class JimengClient {
    * @deprecated 使用异步方式生成视频，请使用 submitVideoTask 和 getVideoTaskResult 代替
    */
   public async generateVideo(params: GenerateVideoParams): Promise<GenerateVideoResponse> {
-    console.log('警告: generateVideo 方法已过时，请使用 submitVideoTask 和 getVideoTaskResult 代替');
+    debugLog('警告: generateVideo 方法已过时，请使用 submitVideoTask 和 getVideoTaskResult 代替');
     
     // 提交任务
     const taskResult = await this.submitVideoTask(params);
@@ -694,15 +703,15 @@ export class JimengClient {
       };
     }
     
-    console.log(`任务提交成功，任务ID: ${taskResult.task_id}`);
-    console.log('开始轮询任务结果...');
+    debugLog(`任务提交成功，任务ID: ${taskResult.task_id}`);
+    debugLog('开始轮询任务结果...');
     
     // 轮询查询任务结果
     const maxAttempts = 30; // 最多等待30次
     const pollingInterval = 5000; // 5秒轮询一次
     
     for (let i = 0; i < maxAttempts; i++) {
-      console.log(`轮询任务结果 (${i+1}/${maxAttempts})...`);
+      debugLog(`轮询任务结果 (${i+1}/${maxAttempts})...`);
       
       // 查询任务结果
       const result = await this.getVideoTaskResult(taskResult.task_id, params.req_key);
@@ -710,7 +719,7 @@ export class JimengClient {
       if (result.success) {
         // 根据任务状态处理
         if ((result.status === 'SUCCEEDED' || result.status === 'done') && result.video_urls && result.video_urls.length > 0) {
-          console.log('视频生成成功!');
+          debugLog('视频生成成功!');
           return {
             success: true,
             video_urls: result.video_urls,
@@ -725,7 +734,7 @@ export class JimengClient {
             task_id: taskResult.task_id
           };
         } else if (result.status === 'PENDING' || result.status === 'RUNNING') {
-          console.log(`任务仍在进行中，状态: ${result.status}，等待 ${pollingInterval/1000} 秒后重试...`);
+          debugLog(`任务仍在进行中，状态: ${result.status}，等待 ${pollingInterval/1000} 秒后重试...`);
           // 任务仍在进行中，继续等待
           await new Promise(resolve => setTimeout(resolve, pollingInterval));
           continue;
@@ -733,7 +742,7 @@ export class JimengClient {
       }
       
       // 查询失败或状态异常，等待后重试
-      console.log('查询任务结果失败或状态异常，等待后重试...');
+      debugLog('查询任务结果失败或状态异常，等待后重试...');
       await new Promise(resolve => setTimeout(resolve, pollingInterval));
     }
     
@@ -787,7 +796,7 @@ export class JimengClient {
         const formattedBody = JSON.stringify(bodyParams);
         
         // 调试信息
-        console.log('提交任务请求体:', formattedBody);
+        debugLog('提交任务请求体:', formattedBody);
         
         // 生成签名和请求头
         const { headers, requestUrl } = this.signV4Request(
@@ -797,8 +806,8 @@ export class JimengClient {
         );
         
         // 调试信息
-        console.log('提交任务请求URL:', requestUrl);
-        console.log('提交任务请求头:', headers);
+        debugLog('提交任务请求URL:', requestUrl);
+        debugLog('提交任务请求头:', headers);
         
         // 发送请求
         const response = await axios({
@@ -809,8 +818,8 @@ export class JimengClient {
         });
         
         // 调试信息
-        console.log('提交任务响应状态码:', response.status);
-        console.log('提交任务响应数据:', JSON.stringify(response.data, null, 2));
+        debugLog('提交任务响应状态码:', response.status);
+        debugLog('提交任务响应数据:', JSON.stringify(response.data, null, 2));
         
         // 处理响应
         if (response.status === 200) {
@@ -847,20 +856,20 @@ export class JimengClient {
           };
         }
         
-        console.error(`提交图生视频任务尝试 #${retryCount + 1} 失败: ${lastError.message}`);
+        debugLog(`提交图生视频任务尝试 #${retryCount + 1} 失败: ${lastError.message}`);
         
         if (retryCount < retries) {
           // 计算重试等待时间 - 固定为60秒以避免API限流
           const waitSeconds = 60;
           const nextRetryTime = new Date(Date.now() + waitSeconds * 1000);
           const timeString = nextRetryTime.toLocaleTimeString();
-          console.log(`提交任务失败，将在 ${timeString} 重试...`);
+          debugLog(`提交任务失败，将在 ${timeString} 重试...`);
           
           // 等待指定时间
           await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
           retryCount++;
         } else {
-          console.log(`已达到最大重试次数 (${retries})，放弃重试`);
+          debugLog(`已达到最大重试次数 (${retries})，放弃重试`);
           break;
         }
       }
@@ -876,7 +885,7 @@ export class JimengClient {
    * 生成视频 - 图片生成视频 (一步到位方式)
    */
   public async generateI2VVideo(params: GenerateI2VParams): Promise<GenerateVideoResponse> {
-    console.log('生成图生视频中...(内部会自动提交任务并轮询结果)');
+    debugLog('生成图生视频中...(内部会自动提交任务并轮询结果)');
     
     // 提交任务
     const taskResult = await this.submitI2VTask(params);
@@ -887,15 +896,15 @@ export class JimengClient {
       };
     }
     
-    console.log(`任务提交成功，任务ID: ${taskResult.task_id}`);
-    console.log('开始轮询任务结果...');
+    debugLog(`任务提交成功，任务ID: ${taskResult.task_id}`);
+    debugLog('开始轮询任务结果...');
     
     // 轮询查询任务结果 - 复用文生视频的查询结果方法
     const maxAttempts = 30; // 最多等待30次
     const pollingInterval = 5000; // 5秒轮询一次
     
     for (let i = 0; i < maxAttempts; i++) {
-      console.log(`轮询任务结果 (${i+1}/${maxAttempts})...`);
+      debugLog(`轮询任务结果 (${i+1}/${maxAttempts})...`);
       
       // 查询任务结果
       const result = await this.getVideoTaskResult(taskResult.task_id, params.req_key || "jimeng_vgfm_i2v_l20");
@@ -903,7 +912,7 @@ export class JimengClient {
       if (result.success) {
         // 根据任务状态处理
         if ((result.status === 'SUCCEEDED' || result.status === 'done') && result.video_urls && result.video_urls.length > 0) {
-          console.log('视频生成成功!');
+          debugLog('视频生成成功!');
           return {
             success: true,
             video_urls: result.video_urls,
@@ -918,7 +927,7 @@ export class JimengClient {
             task_id: taskResult.task_id
           };
         } else if (result.status === 'PENDING' || result.status === 'RUNNING' || result.status === 'in_queue') {
-          console.log(`任务仍在进行中，状态: ${result.status}，等待 ${pollingInterval/1000} 秒后重试...`);
+          debugLog(`任务仍在进行中，状态: ${result.status}，等待 ${pollingInterval/1000} 秒后重试...`);
           // 任务仍在进行中，继续等待
           await new Promise(resolve => setTimeout(resolve, pollingInterval));
           continue;
@@ -926,7 +935,7 @@ export class JimengClient {
       }
       
       // 查询失败或状态异常，等待后重试
-      console.log('查询任务结果失败或状态异常，等待后重试...');
+      debugLog('查询任务结果失败或状态异常，等待后重试...');
       await new Promise(resolve => setTimeout(resolve, pollingInterval));
     }
     

@@ -3,21 +3,31 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { JimengClient } from "../src";
-import dotenv from "dotenv";
+import * as dotenvSilent from "../src/dotenv-silent";
 import { z } from "zod";
 import path from "path";
 import fs from "fs";
 
-// 加载环境变量
-// 首先尝试从当前目录加载.env文件
-dotenv.config();
+// 添加一个全局的日志函数，确保所有日志都输出到stderr而不是stdout
+const log = (...args: any[]) => {
+  process.stderr.write(args.map(arg => typeof arg === 'string' ? arg : JSON.stringify(arg)).join(' ') + '\n');
+};
 
-// 如果环境变量未设置，尝试从用户主目录加载
-if (!process.env.JIMENG_ACCESS_KEY || !process.env.JIMENG_SECRET_KEY) {
-  const homeEnvPath = path.join(process.env.HOME || process.env.USERPROFILE || "", ".jimengpic", ".env");
-  if (fs.existsSync(homeEnvPath)) {
-    dotenv.config({ path: homeEnvPath });
+// 用更简单的方法处理dotenv问题 - 预先加载环境变量
+try {
+  // 首先尝试从当前目录加载.env文件
+  const envResult = dotenvSilent.config();
+  
+  // 如果环境变量未设置，尝试从用户主目录加载
+  if ((!envResult || !envResult.parsed || Object.keys(envResult.parsed).length === 0) && 
+      (!process.env.JIMENG_ACCESS_KEY || !process.env.JIMENG_SECRET_KEY)) {
+    const homeEnvPath = path.join(process.env.HOME || process.env.USERPROFILE || "", ".jimeng-ai-mcp", ".env");
+    if (fs.existsSync(homeEnvPath)) {
+      dotenvSilent.config({ path: homeEnvPath });
+    }
   }
+} catch (error) {
+  log(`加载环境变量时出错: ${error instanceof Error ? error.message : String(error)}`);
 }
 
 // 火山引擎即梦AI API配置
@@ -30,8 +40,8 @@ const JIMENG_ACCESS_KEY = process.env.JIMENG_ACCESS_KEY;
 const JIMENG_SECRET_KEY = process.env.JIMENG_SECRET_KEY;
 
 if (!JIMENG_ACCESS_KEY || !JIMENG_SECRET_KEY) {
-  console.error("警告：未设置环境变量 JIMENG_ACCESS_KEY 和 JIMENG_SECRET_KEY");
-  console.error("服务将启动但无法调用API功能，仅供测试使用");
+  log("警告：未设置环境变量 JIMENG_ACCESS_KEY 和 JIMENG_SECRET_KEY");
+  log("服务将启动但无法调用API功能，仅供测试使用");
 }
 
 // 图片比例映射
@@ -50,7 +60,7 @@ function generatePrompt(text: string, illustration: string, color: string): stri
 // 创建MCP服务器实例
 const server = new McpServer({
   name: "jimeng-ai-mcp",
-  version: "1.0.5",
+  version: "1.0.14",
 });
 
 // 添加服务器信息资源
@@ -84,7 +94,7 @@ server.resource(
   async (uri) => ({
     contents: [{
       uri: uri.href,
-      text: `# generate-video 工具使用帮助\n\n生成视频的工具，使用即梦AI文生视频模型根据文字提示词生成视频。\n\n## 参数\n\n- prompt: 视频内容的描述\n- async: 是否异步生成视频，true表示立即返回任务ID，false或不填表示等待视频生成完成\n\n## 注意\n\n- 使用模型：jimeng_vgfm_t2v_l20\n- 视频生成耗时较长(1-2分钟)，若遇到超时错误，请使用async=true或使用submit-video-task工具\n\n## 示例\n\n请使用generate-video工具生成一段视频，视频内容为"熊猫在竹林中玩耍"。`
+      text: `# generate-video 工具使用帮助\n\n生成视频的工具，使用即梦AI文生视频模型根据文字提示词生成视频。\n\n## 参数\n\n- prompt: 视频内容的描述\n- async: 是否异步生成视频，true表示立即返回任务ID，false表示等待视频生成完成（默认值：true）\n- intent_sync: 是否检测到同步生成意图，如用户提到"一次输出"、"同步输出"、"等待结果"等（默认值：false）\n\n## 行为说明\n\n默认情况下，该工具采用异步方式生成视频，即立即返回任务ID，然后用户需要使用get-video-task工具查询结果。\n\n如果满足以下任一条件，工具将使用同步方式（等待视频生成完成）：\n- 设置async=false\n- 设置intent_sync=true\n- 在提示中包含"一次输出"、"同步输出"、"等待结果"等表示期望即时获取结果的词语\n\n## 注意\n\n- 使用模型：jimeng_vgfm_t2v_l20\n- 视频生成耗时较长(1-2分钟)，若使用同步方式可能遇到超时错误\n- 推荐使用默认的异步方式，避免长时间等待和可能的超时\n\n## 示例\n\n异步方式（推荐）：\n请使用generate-video工具生成一段视频，视频内容为"熊猫在竹林中玩耍"\n\n同步方式：\n请使用generate-video工具生成一段视频，视频内容为"熊猫在竹林中玩耍"，我想一次输出结果`
     }]
   })
 );
@@ -222,7 +232,8 @@ server.tool(
           dimensions: `${imageSize.width}×${imageSize.height}`,
           prompt,
           llm_prompt: llmPrompt,
-          image_url: result.image_urls[0]
+          image_url: result.image_urls[0],
+          image_urls: result.image_urls
         },
         timestamp: new Date().toISOString()
       };
@@ -260,13 +271,21 @@ server.tool(
 // 注册视频生成工具
 server.tool(
   "generate-video",
-  "当用户需要生成视频时使用的工具，基于即梦AI文生视频模型",
+  "当用户需要生成视频时使用的工具，基于即梦AI文生视频模型。默认采用异步方式(async=true)，但如果检测到'一次输出'、'同步输出'、'等待结果'等意图，则使用同步方式。",
   {
     prompt: z.string().describe("视频内容的描述"),
-    async: z.boolean().optional().describe("是否异步生成视频，true表示立即返回任务ID，false或不填表示等待视频生成完成")
+    async: z.boolean().optional().default(true).describe("是否异步生成视频，true表示立即返回任务ID，false表示等待视频生成完成"),
+    intent_sync: z.boolean().optional().default(false).describe("是否检测到同步生成意图，如用户提到'一次输出'、'同步输出'、'等待结果'等")
   },
   async (args, _extra) => {
-    const { prompt, async = false } = args;
+    const { prompt, async = true, intent_sync = false } = args;
+    
+    // 使用同步模式的条件：明确指定async=false或intent_sync=true
+    const useSyncMode = (async === false) || intent_sync;
+    
+    // 日志输出
+    log("视频生成参数:", JSON.stringify(args, null, 2));
+    log("是否使用同步模式:", useSyncMode);
     
     // 检查API密钥是否配置
     if (!JIMENG_ACCESS_KEY || !JIMENG_SECRET_KEY) {
@@ -296,9 +315,9 @@ server.tool(
         debug: false // 设置为true可以查看详细日志
       });
 
-      // 如果是异步模式，只提交任务不等待结果
-      if (async) {
-        console.log("异步模式：提交视频生成任务...");
+      // 如果是异步模式（默认），只提交任务不等待结果
+      if (!useSyncMode) {
+        log("异步模式：提交视频生成任务...");
         
         // 提交视频生成任务
         const result = await client.submitVideoTask({
@@ -308,7 +327,7 @@ server.tool(
         });
         
         if (!result.success || !result.task_id) {
-          console.error("提交视频生成任务失败:", result.error);
+          log(`提交视频生成任务失败: ${result.error}`);
           
           // 构建标准JSON格式的失败返回数据
           const failureData = {
@@ -352,7 +371,7 @@ server.tool(
       }
       
       // 同步模式：提交视频生成任务（一步式方法，内部会处理轮询）
-      console.log("同步模式：正在提交视频生成任务并等待结果...");
+      log("同步模式：正在提交视频生成任务并等待结果...");
       
       const result = await client.generateVideo({
         prompt: prompt,
@@ -361,7 +380,7 @@ server.tool(
       });
       
       if (!result.success || !result.video_urls || result.video_urls.length === 0) {
-        console.error("视频生成失败:", result.error);
+        log("视频生成失败: " + (result.error || "未知错误"));
         
         // 构建标准JSON格式的失败返回数据
         const failureData = {
@@ -389,6 +408,7 @@ server.tool(
         message: "视频生成成功",
         data: {
           prompt,
+          video_urls: result.video_urls,
           video_url: result.video_urls[0],
           task_id: result.task_id || ""
         },
@@ -404,14 +424,20 @@ server.tool(
         ]
       };
     } catch (error) {
-      console.error("视频生成出错:", error);
+      log("视频生成出错: " + (error instanceof Error ? error.message : String(error)));
+      
+      // 检查是否是超时错误
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const isTimeoutError = errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT') || errorMsg.includes('timed out');
       
       // 构建标准JSON格式的错误返回数据
       const errorData = {
         status: "error",
         message: "视频生成时发生错误",
-        error: error instanceof Error ? error.message : String(error),
-        note: "视频生成需要较长时间，如果遇到超时错误，请尝试使用 async=true 参数或使用 submit-video-task 工具",
+        error: errorMsg,
+        note: isTimeoutError 
+          ? "视频生成超时。由于视频生成需要较长时间(1-2分钟)，建议使用异步方式：将async设为true或使用submit-video-task工具"
+          : "视频生成失败，请检查提示词和网络状态",
         timestamp: new Date().toISOString()
       };
       
@@ -467,7 +493,7 @@ server.tool(
       });
 
       // 提交视频生成任务
-      console.log("提交视频生成任务...");
+      log("提交视频生成任务...");
       
       const result = await client.submitVideoTask({
         prompt: prompt,
@@ -476,7 +502,7 @@ server.tool(
       });
       
       if (!result.success || !result.task_id) {
-        console.error("提交视频生成任务失败:", result.error);
+        log(`提交视频生成任务失败: ${result.error}`);
         
         // 构建标准JSON格式的失败返回数据
         const failureData = {
@@ -518,7 +544,7 @@ server.tool(
         ]
       };
     } catch (error) {
-      console.error("提交视频生成任务出错:", error);
+      log("提交视频生成任务出错: " + (error instanceof Error ? error.message : String(error)));
       
       // 构建标准JSON格式的错误返回数据
       const errorData = {
@@ -580,12 +606,12 @@ server.tool(
       });
 
       // 查询任务结果
-      console.log("查询视频生成任务结果...");
+      log("查询视频生成任务结果...");
       
       const result = await client.getVideoTaskResult(task_id, "jimeng_vgfm_t2v_l20");
       
       if (!result.success) {
-        console.error("查询视频生成任务结果失败:", result.error);
+        log(`查询视频生成任务结果失败: ${result.error}`);
         
         // 构建标准JSON格式的失败返回数据
         const failureData = {
@@ -615,6 +641,7 @@ server.tool(
           message: "视频生成成功",
           data: {
             status: result.status,
+            video_urls: result.video_urls,
             video_url: result.video_urls[0],
             task_id: task_id
           },
@@ -674,7 +701,7 @@ server.tool(
         };
       }
     } catch (error) {
-      console.error("查询视频生成任务结果出错:", error);
+      log("查询视频生成任务结果出错: " + (error instanceof Error ? error.message : String(error)));
       
       // 构建标准JSON格式的错误返回数据
       const errorData = {
@@ -701,34 +728,34 @@ server.tool(
 // 启动服务器的主函数
 async function main() {
   try {
+    // 重定向console.log/error到stderr以避免干扰JSON通信
+    console.log = function(...args: any[]) {
+      process.stderr.write(args.map(arg => typeof arg === 'string' ? arg : JSON.stringify(arg)).join(' ') + '\n');
+    };
+    
+    console.error = function(...args: any[]) {
+      process.stderr.write(args.map(arg => typeof arg === 'string' ? arg : JSON.stringify(arg)).join(' ') + '\n');
+    };
+    
+    // 确保不会有dotenv调试输出
+    process.env.DOTENV_DEBUG = "false";
+    
+    // 开始记录到stderr
+    console.log(`即梦AI MCP服务器 v1.0.14 正在启动...`);
+    console.log(`运行环境: Node.js ${process.version}`);
+    console.log(`授权状态: ${JIMENG_ACCESS_KEY && JIMENG_SECRET_KEY ? "已配置" : "未配置"}`);
+    
     // 添加stdio传输层
     const transport = new StdioServerTransport();
+    
+    // 连接服务器
     await server.connect(transport);
     
-    // 使用JSON格式返回启动成功的信息
-    const startupInfo = {
-      status: "success",
-      message: "即梦AI MCP服务器已启动",
-      serverInfo: {
-        name: "jimengpic-mcp",
-        version: "1.0.5",
-        authStatus: JIMENG_ACCESS_KEY && JIMENG_SECRET_KEY ? "configured" : "unconfigured"
-      },
-      timestamp: new Date().toISOString()
-    };
-    
-    // 打印JSON格式的启动信息
-    console.log(JSON.stringify(startupInfo, null, 2));
+    // 服务器启动成功
+    console.log(`MCP服务器启动成功，等待客户端请求...`);
   } catch (error) {
-    // 错误信息也使用JSON格式
-    const errorInfo = {
-      status: "error",
-      message: "MCP服务器启动失败",
-      error: error instanceof Error ? error.message : String(error),
-      timestamp: new Date().toISOString()
-    };
-    
-    console.error(JSON.stringify(errorInfo, null, 2));
+    // 记录错误到标准错误
+    process.stderr.write(`错误: MCP服务器启动失败 - ${error instanceof Error ? error.message : String(error)}\n`);
     process.exit(1);
   }
 }

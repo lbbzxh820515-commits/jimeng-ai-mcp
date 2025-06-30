@@ -1,6 +1,6 @@
 {
   "name": "jimeng-ai-mcp",
-  "version": "1.0.5",
+  "version": "1.0.14",
   "description": "火山引擎即梦AI多模态生成服务MCP工具",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
@@ -8,8 +8,9 @@
     "jimeng-ai-mcp": "dist/examples/mcp-server.js"
   },
   "scripts": {
+    "start": "DOTENV_DEBUG=false node dist/examples/mcp-server.js",
+    "start:dev": "DOTENV_DEBUG=false ts-node examples/mcp-server.ts",
     "build": "tsc",
-    "start": "node dist/examples/mcp-server.js",
     "dev": "ts-node examples/mcp-server.ts",
     "test": "jest",
     "prepublishOnly": "npm run build"
@@ -60,5 +61,6 @@
   "bugs": {
     "url": "https://github.com/freeleepm/jimeng-ai-mcp/issues"
   },
-  "homepage": "https://github.com/freeleepm/jimeng-ai-mcp#readme"
+  "homepage": "https://github.com/freeleepm/jimeng-ai-mcp#readme",
+  "mcp": "./mcp.json"
 }

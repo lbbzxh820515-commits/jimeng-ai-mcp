@@ -1,6 +1,6 @@
 {
   "name": "jimeng-ai-mcp",
-  "version": "1.0.5",
+  "version": "1.0.14",
   "description": "火山引擎即梦AI多模态生成服务MCP工具",
   "author": "Jimeng AI",
   "license": "MIT",
@@ -76,7 +76,13 @@
           },
           "async": {
             "type": "boolean",
-            "description": "是否异步生成视频，true表示立即返回任务ID，false或不填表示等待视频生成完成"
+            "description": "是否异步生成视频，true表示立即返回任务ID，false或不填表示等待视频生成完成",
+            "default": true
+          },
+          "intent_sync": {
+            "type": "boolean",
+            "description": "是否检测到同步生成意图，如用户提到'一次输出'、'同步输出'、'等待结果'等",
+            "default": false
           },
           "region": {
             "type": "string",
