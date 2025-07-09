@@ -36,6 +36,37 @@
 - 🔄 支持异步任务处理和状态追踪
 - 🎛️ 自定义参数控制 (尺寸、比例、帧数等)
 
+## 系统架构
+
+以下流程图展示了即梦AI多模态MCP的工作流程和系统架构：
+
+```mermaid
+graph LR
+    A[用户输入] --> B[MCP协议解析]
+    B --> C{工具选择}
+    C -->|图像生成| D[generate-image]
+    C -->|视频生成| E[generate-video]
+    C -->|提交视频任务| F[submit-video-task]
+    C -->|查询视频任务| G[get-video-task]
+    
+    D --> H[JimengClient]
+    E --> H
+    F --> H
+    G --> H
+    
+    H --> I{API调用}
+    I -->|图生成| J[火山引擎即梦AI<br/>图像生成API]
+    I -->|视频生成| K[火山引擎即梦AI<br/>视频生成API]
+    I -->|任务查询| L[火山引擎即梦AI<br/>任务状态API]
+    
+    J --> M[生成结果]
+    K --> M
+    L --> M
+    
+    M --> N[返回MCP响应]
+    N --> O[用户展示]
+```
+
 ## 可用MCP工具
 
 | 工具名称 | 描述 | 主要参数 |
