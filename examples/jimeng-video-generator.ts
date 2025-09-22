@@ -14,15 +14,13 @@
  *    查询任务：npx ts-node examples/jimeng-video-generator.ts --check-task "任务ID" --type "t2v或i2v"
  * 
  * 注: 
- * - 文生视频使用模型标识符 jimeng_vgfm_t2v_l20
- * - 图生视频使用模型标识符 jimeng_vgfm_i2v_l20
+ * - 文生视频使用模型标识符 jimeng_vgfm_t2v_l22
+ * - 图生视频使用模型标识符 jimeng_vgfm_i2v_l22
  * - 默认使用区域: cn-north-1
  */
 
 import { JimengClient, GenerateVideoParams, GenerateI2VParams } from '../src';
 import * as dotenv from 'dotenv';
-import * as fs from 'fs';
-import * as path from 'path';
 
 // 加载环境变量
 dotenv.config();
@@ -37,12 +35,8 @@ for (const envVar of requiredEnvVars) {
   }
 }
 
-// 创建客户端
-const client = new JimengClient({
-  accessKey: process.env.JIMENG_ACCESS_KEY!,
-  secretKey: process.env.JIMENG_SECRET_KEY!,
-  debug: true, // 启用调试模式
-});
+// 客户端实例会在 main 中初始化，确保可根据命令行动态设置调试模式
+let client: JimengClient;
 
 // 默认区域
 const DEFAULT_REGION = 'cn-north-1';
@@ -52,7 +46,7 @@ const DEFAULT_REGION = 'cn-north-1';
  */
 function parseArgs(args: string[]) {
   const params: Record<string, string> = {};
-  
+
   for (let i = 0; i < args.length; i++) {
     if (args[i].startsWith('--')) {
       const key = args[i].substring(2);
@@ -69,10 +63,155 @@ function parseArgs(args: string[]) {
   return params;
 }
 
+function parseNumberOption(value?: string): number | undefined {
+  if (typeof value === 'undefined') {
+    return undefined;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseBooleanOption(value?: string): boolean | undefined {
+  if (typeof value === 'undefined') {
+    return undefined;
+  }
+  const normalized = value.toLowerCase();
+  if (normalized === 'true' || normalized === '1') {
+    return true;
+  }
+  if (normalized === 'false' || normalized === '0') {
+    return false;
+  }
+  return true;
+}
+
+function parseJSONOption(label: string, value?: string): Record<string, any> | undefined {
+  if (typeof value === 'undefined') {
+    return undefined;
+  }
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    console.warn(`无法解析 ${label} 的 JSON 内容:`, error instanceof Error ? error.message : error);
+    return undefined;
+  }
+}
+
+function buildResultExtraBody(args: Record<string, string>): Record<string, any> | undefined {
+  let extra: Record<string, any> | undefined;
+  const resultReturnUrl = parseBooleanOption(args['result-return-url']);
+  if (typeof resultReturnUrl !== 'undefined') {
+    extra = extra || {};
+    extra.return_url = resultReturnUrl;
+  }
+
+  const resultExtraJson = parseJSONOption('result-extra-json', args['result-extra-json']);
+  if (resultExtraJson) {
+    extra = { ...(extra || {}), ...resultExtraJson };
+  }
+
+  return extra;
+}
+
+function applySharedVideoOptions(target: any, args: Record<string, string>) {
+  if (args['region']) {
+    target.region = args['region'];
+  }
+  if (args['req-key']) {
+    target.req_key = args['req-key'];
+  }
+  if (args['negative-prompt']) {
+    target.negative_prompt = args['negative-prompt'];
+  }
+  const duration = parseNumberOption(args['duration']);
+  if (typeof duration === 'number') {
+    target.duration = duration;
+  }
+  const videoNum = parseNumberOption(args['video-num']);
+  if (typeof videoNum === 'number') {
+    target.video_num = videoNum;
+  }
+  const frameRate = parseNumberOption(args['frame-rate']);
+  if (typeof frameRate === 'number') {
+    target.frame_rate = frameRate;
+  }
+  if (args['aspect-ratio']) {
+    target.aspect_ratio = args['aspect-ratio'];
+  } else if (args['ratio']) {
+    target.aspect_ratio = args['ratio'];
+  }
+  const width = parseNumberOption(args['width']);
+  if (typeof width === 'number') {
+    target.width = width;
+  }
+  const height = parseNumberOption(args['height']);
+  if (typeof height === 'number') {
+    target.height = height;
+  }
+  if (args['resolution']) {
+    target.resolution = args['resolution'];
+  }
+  const cfgScale = parseNumberOption(args['cfg-scale']);
+  if (typeof cfgScale === 'number') {
+    target.cfg_scale = cfgScale;
+  }
+  const seed = parseNumberOption(args['seed']);
+  if (typeof seed === 'number') {
+    target.seed = seed;
+  }
+  const motionStrength = parseNumberOption(args['motion-strength']);
+  if (typeof motionStrength === 'number') {
+    target.motion_strength = motionStrength;
+  }
+  const returnUrl = parseBooleanOption(args['return-url']);
+  if (typeof returnUrl !== 'undefined') {
+    target.return_url = returnUrl;
+  }
+  const returnBase64 = parseBooleanOption(args['return-base64']);
+  if (typeof returnBase64 !== 'undefined') {
+    target.return_video_base64 = returnBase64;
+  }
+  const musicJson = parseJSONOption('music-json', args['music-json']);
+  if (musicJson) {
+    target.music = musicJson;
+  }
+  const logoJson = parseJSONOption('logo-json', args['logo-json']);
+  if (logoJson) {
+    target.logo_info = logoJson;
+  }
+  const extraJson = parseJSONOption('extra-json', args['extra-json']);
+  if (extraJson) {
+    target.advanced_params = { ...(target.advanced_params || {}), ...extraJson };
+  }
+  if (args['action']) {
+    target.action = args['action'];
+  }
+  if (args['version']) {
+    target.version = args['version'];
+  }
+  if (args['result-action']) {
+    target.result_action = args['result-action'];
+  }
+  if (args['result-version']) {
+    target.result_version = args['result-version'];
+  }
+  if (args['result-req-json']) {
+    target.result_req_json = args['result-req-json'];
+  }
+
+  const resultExtra = buildResultExtraBody(args);
+  if (resultExtra) {
+    target.result_extra_body = {
+      ...(target.result_extra_body || {}),
+      ...resultExtra,
+    };
+  }
+}
+
 /**
  * 展示文生视频功能
  */
-async function demoTextToVideo(prompt: string, oneStep: boolean = false) {
+async function demoTextToVideo(prompt: string, oneStep: boolean = false, args: Record<string, string> = {}) {
   console.log('========== 文生视频示例 ==========');
   console.log('提示词:', prompt);
   console.log();
@@ -80,9 +219,11 @@ async function demoTextToVideo(prompt: string, oneStep: boolean = false) {
   // 设置参数
   const params: GenerateVideoParams = {
     prompt: prompt,
-    req_key: 'jimeng_vgfm_t2v_l20',
-    region: DEFAULT_REGION
+    req_key: 'jimeng_vgfm_t2v_l22',
+    region: args['region'] || DEFAULT_REGION
   };
+
+  applySharedVideoOptions(params, args);
 
   try {
     // 一步到位方式生成
@@ -95,13 +236,20 @@ async function demoTextToVideo(prompt: string, oneStep: boolean = false) {
       result.video_urls.forEach((url, index) => {
         console.log(`[${index + 1}] ${url}`);
       });
-      
+
+      if (result.video_base64_list && result.video_base64_list.length > 0) {
+        console.log('\n返回了 Base64 视频数据，列表长度:', result.video_base64_list.length);
+      }
+
       // 任务ID可以用于后续查询
       if (result.task_id) {
         console.log('任务ID:', result.task_id);
       }
     } else if (result.success) {
       console.log('\n视频生成成功，但未返回视频URL');
+      if (result.video_base64_list && result.video_base64_list.length > 0) {
+        console.log('收到 Base64 数据，列表长度:', result.video_base64_list.length);
+      }
       if (result.task_id) {
         console.log('任务ID:', result.task_id);
       }
@@ -121,7 +269,7 @@ async function demoTextToVideo(prompt: string, oneStep: boolean = false) {
 /**
  * 展示图生视频功能
  */
-async function demoImageToVideo(imageUrl: string, prompt?: string, oneStep: boolean = false) {
+async function demoImageToVideo(imageUrl: string, prompt?: string, oneStep: boolean = false, args: Record<string, string> = {}) {
   console.log('========== 图生视频示例 ==========');
   console.log('图片URL:', imageUrl);
   if (prompt) console.log('提示词:', prompt);
@@ -130,16 +278,18 @@ async function demoImageToVideo(imageUrl: string, prompt?: string, oneStep: bool
   // 设置参数 - 注意使用图片URL数组格式
   const params: GenerateI2VParams = {
     image_urls: [imageUrl],  // 使用图片URL数组
-    req_key: 'jimeng_vgfm_i2v_l20',
-    aspect_ratio: '16:9',  // 指定长宽比，避免使用默认的"keep_ratio"
-    region: DEFAULT_REGION
+    req_key: 'jimeng_vgfm_i2v_l22',
+    aspect_ratio: args['aspect-ratio'] || args['ratio'] || '16:9',
+    region: args['region'] || DEFAULT_REGION
   };
-  
+
   // 如果提供了提示词，添加到参数中
   if (prompt) {
     params.prompt = prompt;
   }
-  
+
+  applySharedVideoOptions(params, args);
+
   try {
     // 异步提交任务
     console.log('提交图生视频任务...');
@@ -162,8 +312,18 @@ async function demoImageToVideo(imageUrl: string, prompt?: string, oneStep: bool
         console.log(`轮询任务结果 (${i}/${maxTries})...`);
         
         // 查询任务结果
-        const result = await client.getVideoTaskResult(taskResult.task_id!, 'jimeng_vgfm_i2v_l20');
-        
+        const result = await client.getVideoTaskResult(
+          taskResult.task_id!,
+          params.req_key || 'jimeng_vgfm_i2v_l22',
+          {
+            region: params.region,
+            action: params.result_action,
+            version: params.result_version,
+            req_json: params.result_req_json,
+            extra_body: params.result_extra_body
+          }
+        );
+
         if (result.success && result.status === 'SUCCEEDED') {
           console.log('视频生成成功!');
           console.log('视频URL列表:');
@@ -173,6 +333,9 @@ async function demoImageToVideo(imageUrl: string, prompt?: string, oneStep: bool
             });
           } else {
             console.log('未返回视频URL');
+          }
+          if (result.video_base64_list && result.video_base64_list.length > 0) {
+            console.log('同时返回了 Base64 视频数据，列表长度:', result.video_base64_list.length);
           }
           return;
         } else if (!result.success) {
@@ -208,31 +371,48 @@ async function demoImageToVideo(imageUrl: string, prompt?: string, oneStep: bool
 /**
  * 查询特定任务的结果
  */
-async function checkTaskResult(taskId: string, type: string = 't2v') {
+async function checkTaskResult(taskId: string, args: Record<string, string> = {}) {
   console.log(`========== 查询任务结果 ==========`);
   console.log(`任务ID: ${taskId}`);
-  console.log(`任务类型: ${type === 'i2v' ? '图生视频' : '文生视频'}`);
+  const taskType = (args['type'] || 't2v').toLowerCase();
+  console.log(`任务类型: ${taskType === 'i2v' ? '图生视频' : '文生视频'}`);
   console.log();
-  
+
   try {
     // 根据任务类型选择合适的模型标识符
-    const reqKey = type === 'i2v' ? 'jimeng_vgfm_i2v_l20' : 'jimeng_vgfm_t2v_l20';
-    
+    const reqKey = args['req-key']
+      ? args['req-key']
+      : taskType === 'i2v'
+        ? 'jimeng_vgfm_i2v_l22'
+        : 'jimeng_vgfm_t2v_l22';
+
     // 查询任务结果
     console.log('查询任务结果中...');
-    const result = await client.getVideoTaskResult(taskId, reqKey);
-    
+    const result = await client.getVideoTaskResult(taskId, reqKey, {
+      region: args['region'],
+      action: args['result-action'],
+      version: args['result-version'],
+      req_json: args['result-req-json'],
+      extra_body: buildResultExtraBody(args)
+    });
+
     if (result.success) {
       console.log('\n任务状态:', result.status);
-      
+
       if ((result.status === 'SUCCEEDED' || result.status === 'done') && result.video_urls && result.video_urls.length > 0) {
         console.log('视频生成成功!');
         console.log('视频URL列表:');
         result.video_urls.forEach((url, index) => {
           console.log(`[${index + 1}] ${url}`);
         });
+        if (result.video_base64_list && result.video_base64_list.length > 0) {
+          console.log('返回了 Base64 视频数据，列表长度:', result.video_base64_list.length);
+        }
       } else if ((result.status === 'SUCCEEDED' || result.status === 'done')) {
         console.log('视频生成成功，但未返回视频URL');
+        if (result.video_base64_list && result.video_base64_list.length > 0) {
+          console.log('返回了 Base64 数据，列表长度:', result.video_base64_list.length);
+        }
       } else if (result.status === 'FAILED') {
         console.error('视频生成失败!');
       } else {
@@ -249,17 +429,19 @@ async function checkTaskResult(taskId: string, type: string = 't2v') {
 /**
  * 异步视频生成示例
  */
-async function demoAsyncVideoGeneration(prompt: string) {
+async function demoAsyncVideoGeneration(prompt: string, args: Record<string, string> = {}) {
   console.log('========== 异步视频生成示例 ==========');
   console.log('提示词:', prompt);
   console.log();
-  
+
   // 设置参数
   const params: GenerateVideoParams = {
     prompt: prompt,
-    req_key: 'jimeng_vgfm_t2v_l20'
+    req_key: 'jimeng_vgfm_t2v_l22'
   };
-  
+
+  applySharedVideoOptions(params, args);
+
   try {
     // 提交任务
     console.log('提交视频生成任务...');
@@ -289,47 +471,42 @@ async function demoAsyncVideoGeneration(prompt: string) {
 async function main() {
   // 解析命令行参数
   const args = parseArgs(process.argv.slice(2));
-  
+
   // 是否使用一步到位模式
   const oneStep = typeof args['one-step'] !== 'undefined';
-  
+
   // 创建客户端
-  const client = new JimengClient({
+  client = new JimengClient({
     accessKey: process.env.JIMENG_ACCESS_KEY!,
     secretKey: process.env.JIMENG_SECRET_KEY!,
     debug: typeof args['verbose'] !== 'undefined' || typeof args['debug'] !== 'undefined',
   });
-  
+
   // 处理不同的命令模式
-  
+
   // 检查任务状态模式
   if (args['check-task']) {
-    const taskType = args['type'] || 't2v';  // 默认为文生视频任务
-    const reqKey = taskType === 't2v' 
-      ? 'jimeng_vgfm_t2v_l20'
-      : 'jimeng_vgfm_i2v_l20';
-      
-    await checkTaskResult(args['check-task'], reqKey);
+    await checkTaskResult(args['check-task'], args);
     return;
   }
-  
+
   // 检查文生视频模式
   if (args['text-to-video']) {
-    await demoTextToVideo(args['text-to-video'], oneStep);
+    await demoTextToVideo(args['text-to-video'], oneStep, args);
     return;
   }
-  
+
   // 检查图生视频模式
   if (args['image-to-video']) {
-    await demoImageToVideo(args['image-to-video'], args['prompt'], oneStep);
+    await demoImageToVideo(args['image-to-video'], args['prompt'], oneStep, args);
     return;
   }
-  
+
   // 默认运行文生视频示例
   if (oneStep) {
-    await demoTextToVideo("一只可爱的小猫在草地上玩耍", true);
+    await demoTextToVideo("一只可爱的小猫在草地上玩耍", true, args);
   } else {
-    await demoAsyncVideoGeneration("一只可爱的小猫在草地上玩耍");
+    await demoAsyncVideoGeneration("一只可爱的小猫在草地上玩耍", args);
   }
 }
 
