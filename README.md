@@ -28,9 +28,9 @@
 
 ## 核心功能
 
-- ✅ **文生图** - 通过文本描述生成高质量图像 (模型: jimeng_t2i_s20pro)
-- ✅ **文生视频** - 将文本描述转换为流畅视频 (模型: jimeng_vgfm_t2v_l20)
-- ✅ **图生视频** - 将静态图像转换为动态视频 (模型: jimeng_vgfm_i2v_l20)
+- ✅ **文生图** - 通过文本描述生成高质量图像 (模型: jimeng_t2i_v40)
+- ✅ **文生视频** - 将文本描述转换为流畅视频 (模型: jimeng_vgfm_t2v_l22)
+- ✅ **图生视频** - 将静态图像转换为动态视频 (模型: jimeng_vgfm_i2v_l22)
 - ✅ **多平台支持** - 支持 macOS、Linux、Windows 及 WSL 环境
 - 🛠️ 完整TypeScript类型定义和错误处理
 - 🔄 支持异步任务处理和状态追踪
@@ -441,11 +441,29 @@ npm publish
 - `text`: 要在图片上显示的文字
 - `illustration`: 作为图片配饰的插画元素关键词
 - `color`: 图片的背景主色调
-- `ratio`: 图片比例，支持: 4:3 (512×384), 3:4 (384×512), 16:9 (512×288), 9:16 (288×512)
+- `ratio`: 图片比例，支持: 4:3 (2304×1728), 3:4 (1728×2304), 16:9 (2560×1440), 9:16 (1440×2560)
+- `model` *(可选)*: 指定文生图模型 `req_key`，默认 `jimeng_t2i_v40`
 
 **示例**：
 ```
 请使用generate-image工具生成一张图片，图片上显示"创新未来"文字，配饰元素包括科技、星空、光线，背景色调为蓝色，比例为16:9。
+```
+
+### image-to-image
+
+基于参考图片生成变体或进行局部编辑。
+
+**参数**：
+- `prompt`: 目标图像的描述
+- `references`: 参考图片列表，支持 HTTP(S) URL 或绝对本地路径，至少一项
+- `model` *(可选)*: 指定图生图模型 `req_key`，默认 `jimeng_t2i_v40`
+- `width` / `height` *(可选)*: 指定输出宽高 (像素)
+- `size` *(可选)*: 指定输出面积 (像素平方)
+- `return_url` *(可选)*: 是否返回图片 URL，默认 `true`
+
+**示例**：
+```
+请使用image-to-image工具，根据参考图"/data/refs/hero.png"和"https://example.com/pose.jpg"，生成提示词为"未来派机甲角色"的图像。
 ```
 
 ### generate-video
@@ -489,7 +507,7 @@ import { JimengClient } from 'jimeng-ai-mcp';
 const client = new JimengClient({
   accessKey: 'YOUR_ACCESS_KEY',
   secretKey: 'YOUR_SECRET_KEY',
-  region: 'cn-beijing', // 默认区域
+  region: 'cn-north-1', // 默认区域
   debug: false // 设置为true可以查看详细日志
 });
 
@@ -497,12 +515,34 @@ const client = new JimengClient({
 async function generateImage() {
   const result = await client.generateImage({
     prompt: "一只可爱的猫咪在草地上玩耍",
-    width: 512,
-    height: 512
+    width: 2048,
+    height: 2048,
+    force_single: true
   });
   
   if (result.success && result.image_urls && result.image_urls.length > 0) {
     console.log('图像URL:', result.image_urls[0]);
+    console.log('任务ID:', result.task_id);
+    console.log('最终状态:', result.status);
+  } else {
+    console.error('生成失败:', result.error);
+  }
+}
+
+// 图生图示例（自动上传本地参考图）
+async function generateImageWithReferences() {
+  const result = await client.generateImage({
+    prompt: "复古科幻风格的人像",
+    image_paths: ["/absolute/path/to/reference.png"],
+    image_urls: ["https://example.com/pose.jpg"],
+    req_key: "jimeng_t2i_v40",
+    width: 2048,
+    height: 2048,
+    return_url: true
+  });
+
+  if (result.success && result.image_urls?.length) {
+    console.log('图像URL:', result.image_urls);
   } else {
     console.error('生成失败:', result.error);
   }
@@ -537,35 +577,98 @@ async function generateImageToVideo() {
 }
 ```
 
+> 提示：即梦AI 图片生成4.0 接口支持 `force_single`、`size`、`width`/`height`、`min_ratio`/`max_ratio`、`scale` 等高级参数，可根据业务场景控制输出数量、分辨率和比例。本项目默认使用 `force_single: true` 并请求 2K 分辨率，以便快速得到稳定的单张结果。命令行示例支持第 5 个参数传入水印文案，并可通过 `--model <req_key>`（或第 6 个位置参数）指定自定义模型，例如：
+>
+> ```bash
+> npx ts-node examples/jimeng-image-generator.ts "一只可爱的猫咪" 2048 2048 "这里是明水印内容" --model jimeng_t2i_v40
+> ```
+>
+> 图生图示例脚本会自动上传本地绝对路径参考图：
+>
+> ```bash
+> npx ts-node examples/jimeng-image-to-image.ts "未来派机甲角色" /data/refs/hero.png https://example.com/pose.jpg --width 2048 --height 2048
+> ```
+
 ### 高级用法：异步任务处理
 
-对于耗时较长的视频生成任务，可以使用异步方式：
+即梦AI 图片生成4.0 和视频生成接口都使用异步任务模式。可以分别使用 `submitImageTask`/`getImageTaskResult` 与视频相关的任务接口进行轮询：
 
 ```typescript
-// 文生视频异步方式
-async function generateVideoAsync() {
-  // 提交任务
-  const taskResult = await client.submitVideoTask({
+// 文生图异步方式（jimeng_t2i_v40）
+async function generateImageAsync() {
+  const taskResult = await client.submitImageTask({
     prompt: "一只可爱的猫咪在草地上玩耍",
-    req_key: "jimeng_vgfm_t2v_l20"
+    width: 2048,
+    height: 2048,
+    force_single: true
   });
-  
-  console.log('任务ID:', taskResult.task_id);
-  
-  // 轮询任务结果
+
+  if (!taskResult.success || !taskResult.task_id) {
+    console.error('提交失败:', taskResult.error);
+    return;
+  }
+
+  console.log('图像任务ID:', taskResult.task_id);
+
   let result;
   do {
-    // 等待60秒再查询（符合API限制）
-    await new Promise(resolve => setTimeout(resolve, 60000));
-    
-    // 查询任务结果
-    result = await client.getVideoTaskResult(taskResult.task_id);
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    result = await client.getImageTaskResult(taskResult.task_id, { return_url: true });
     console.log('任务状态:', result.status);
-    
+  } while (result.status === 'IN_QUEUE' || result.status === 'GENERATING');
+
+  if (result.success && result.status === 'DONE' && result.image_urls?.length) {
+    console.log('图像URL:', result.image_urls);
+  } else {
+    console.error('生成失败:', result.error);
+  }
+}
+
+// 查询结果时透传水印参数
+async function getResultWithWatermark(taskId: string) {
+  const result = await client.getImageTaskResult(taskId, {
+    logo_info: {
+      add_logo: true,
+      position: 0,
+      language: 0,
+      opacity: 1,
+      logo_text_content: '这里是明水印内容'
+    },
+    return_url: true
+  });
+
+  if (result.success && result.status === 'DONE') {
+    console.log('带水印的图像 URL:', result.image_urls);
+  }
+}
+
+// 文生视频异步方式
+async function generateVideoAsync() {
+  const taskResult = await client.submitVideoTask({
+    prompt: "一只可爱的猫咪在草地上玩耍",
+    req_key: "jimeng_vgfm_t2v_l22",
+    duration: 8,
+    aspect_ratio: "16:9",
+    return_url: true,
+    return_video_base64: false
+  });
+
+  console.log('视频任务ID:', taskResult.task_id);
+
+  let result;
+  do {
+    await new Promise(resolve => setTimeout(resolve, 60000));
+    result = await client.getVideoTaskResult(taskResult.task_id, "jimeng_vgfm_t2v_l22", {
+      extra_body: { return_url: true }
+    });
+    console.log('任务状态:', result.status);
   } while (result.status === 'PENDING' || result.status === 'RUNNING');
-  
+
   if (result.success && result.status === 'SUCCEEDED') {
     console.log('视频URL:', result.video_urls);
+    if (result.video_base64_list?.length) {
+      console.log('返回的 Base64 视频数量:', result.video_base64_list.length);
+    }
   } else {
     console.error('生成失败:', result.error);
   }
@@ -573,20 +676,25 @@ async function generateVideoAsync() {
 
 // 图生视频异步方式
 async function generateImageToVideoAsync() {
-  // 提交任务
   const taskResult = await client.submitI2VTask({
     image_urls: ["https://example.com/image.jpg"],
     prompt: "波浪效果",
-    req_key: "jimeng_vgfm_i2v_l20"
+    req_key: "jimeng_vgfm_i2v_l22",
+    aspect_ratio: "21:9",
+    return_url: true
   });
-  
-  console.log('任务ID:', taskResult.task_id);
-  
-  // 查询任务结果（简化示例，实际应用需要轮询）
-  const result = await client.getVideoTaskResult(taskResult.task_id, "jimeng_vgfm_i2v_l20");
-  
+
+  console.log('图生视频任务ID:', taskResult.task_id);
+
+  const result = await client.getVideoTaskResult(taskResult.task_id, "jimeng_vgfm_i2v_l22", {
+    extra_body: { return_url: true }
+  });
+
   if (result.success && result.status === 'SUCCEEDED') {
     console.log('视频URL:', result.video_urls);
+    if (result.video_base64_list?.length) {
+      console.log('返回的 Base64 视频数量:', result.video_base64_list.length);
+    }
   }
 }
 ```
@@ -688,10 +796,10 @@ MIT
 ```
 
 支持的图片比例：
-- `4:3` - 512×384像素
-- `3:4` - 384×512像素
-- `16:9` - 512×288像素
-- `9:16` - 288×512像素
+- `4:3` - 2304×1728像素
+- `3:4` - 1728×2304像素
+- `16:9` - 2560×1440像素
+- `9:16` - 1440×2560像素
 
 ### 视频生成 (generate-video)
 
@@ -702,6 +810,10 @@ MIT
 - `prompt` - 视频内容描述（必填）
 - `async` - 是否使用异步方式（可选，默认为`true`）
 - `intent_sync` - 是否检测到同步生成意图（可选，默认为`false`）
+- `duration` - 视频时长（秒，可选，默认由模型自动决定）
+- `aspect_ratio` - 视频宽高比（例如`16:9`、`21:9`，可选）
+- `return_url` - 是否返回结果中的临时下载链接（可选，默认`false`）
+- `return_video_base64` - 是否返回视频Base64数据（可选，默认`false`）
 
 #### 行为模式
 
@@ -710,11 +822,12 @@ MIT
    - 需要后续使用`get-video-task`工具查询结果
    - 适合生产环境和避免超时的场景
 
-   ```json
-   {
-     "prompt": "一只熊猫在竹林中玩耍"
-   }
-   ```
+  ```json
+  {
+    "prompt": "一只熊猫在竹林中玩耍",
+    "return_url": true
+  }
+  ```
 
 2. **同步模式**：
    - 等待视频生成完成后返回结果（可能需要1-2分钟）
@@ -726,12 +839,13 @@ MIT
    - 设置`intent_sync=true`
    - 在提示中包含表示期望即时结果的关键词（如"一次输出"、"同步输出"、"等待结果"等）
 
-   ```json
-   {
-     "prompt": "一只熊猫在竹林中玩耍",
-     "async": false
-   }
-   ```
+  ```json
+  {
+    "prompt": "一只熊猫在竹林中玩耍",
+    "async": false,
+    "duration": 10
+  }
+  ```
 
    或通过意图表达（大模型会自动识别并设置`intent_sync=true`）：
    
@@ -754,7 +868,9 @@ MIT
 ```json
 // submit-video-task
 {
-  "prompt": "一只白色的小猪在沙滩上跑动"
+  "prompt": "一只白色的小猪在沙滩上跑动",
+  "req_key": "jimeng_vgfm_t2v_l22",
+  "return_url": true
 }
 ```
 
@@ -763,6 +879,7 @@ MIT
 ```json
 // get-video-task
 {
-  "task_id": "12345678901234567890"
+  "task_id": "12345678901234567890",
+  "return_url": true
 }
-``` 
+```
